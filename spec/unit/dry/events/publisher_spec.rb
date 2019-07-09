@@ -144,4 +144,49 @@ RSpec.describe Dry::Events::Publisher do
       expect(result).to eql([:test_event])
     end
   end
+
+  describe '#unsubscribe' do
+    require 'dry/events/listener'
+    let!(:captured) { [] }
+    let!(:publisher) do
+      Class.new {
+        include Dry::Events::Publisher[:test_publisher]
+
+        register_event :test_event
+      }.new
+    end
+    let(:listener) do
+      Class.new {
+        include Dry::Events::Listener[:test_publisher]
+      }
+    end
+
+    let!(:listener_object) do
+      Class.new do
+        attr_accessor :captured
+        def initialize(captured)
+          @captured = captured
+        end
+        def on_test_event(event)
+          captured << event.id
+        end
+      end
+      .new(captured)
+    end
+
+    it 'unsubscribe when many listeners' do
+      listener.subscribe(:test_event) do |event|
+        captured << event.id
+      end
+      publisher.subscribe(listener_object)
+
+      publisher.publish(:test_event)
+      expect(captured).to eql(Array.new(2) { :test_event })
+
+      publisher.unsubscribe(listener_object)
+
+      publisher.publish(:test_event)
+      expect(captured).to eql(Array.new(3) { :test_event })
+    end
+  end
 end
